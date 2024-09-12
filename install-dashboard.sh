@@ -2,6 +2,8 @@
 
 USERNAME=$(whoami) && \
 WORKDIR="/home/${USERNAME}/.nezha-dashboard"
+CURRENT_VERSION="v0.0.0"
+RELEASE_LATEST="v0.0.0"
 
 get_current_version() {
     # echo "当前版本"
@@ -13,6 +15,7 @@ get_current_version() {
         CURRENT_VERSION=$(cat ${WORKDIR}/VERSION)
         # echo "2当前版本：${CURRENT_VERSION}"
     fi
+    echo "当前版本：${CURRENT_VERSION}"
 }
 
 get_latest_version() {
@@ -22,17 +25,29 @@ get_latest_version() {
         echo "error: Failed to get the latest release version, please check your network."
         exit 1
     fi
+    echo "最新版本：${RELEASE_LATEST}"
 }
 
 download_nezha() {
-    DOWNLOAD_LINK="https://github.com/ansoncloud8/am-nezha-freebsd/releases/latest/download/dashboard"
+    if [ -z "$VERSION" ]; then
+        # 如果没有传入VERSION变量，下载最新版本
+        DOWNLOAD_LINK="https://github.com/ansoncloud8/am-nezha-freebsd/releases/latest/download/dashboard"
+        VERSION=$RELEASE_LATEST  # 将版本设置为最新版本
+    else
+        # 如果传入了VERSION变量，下载指定版本
+        DOWNLOAD_LINK="https://github.com/ansoncloud8/am-nezha-freebsd/releases/download/${VERSION}/dashboard"
+    fi
+
     if ! wget -qO "$INSTALLER_FILE" "$DOWNLOAD_LINK"; then
-        echo 'error: Download failed! Please check your network or try again.'
+        echo 'error: 下载失败，请检查网络或重试。'
         return 1
     fi
-    curl -s https://api.github.com/repos/ansoncloud8/am-nezha-freebsd/releases/latest | jq -r '.tag_name' > ${WORKDIR}/VERSION
+    echo "下载版本：${VERSION}"
+	curl -s https://api.github.com/repos/ansoncloud8/am-nezha-freebsd/releases/latest | jq -r '.tag_name' > ${WORKDIR}/VERSION
+    echo "${VERSION}" > "${WORKDIR}/VERSION"  # 将版本信息写入VERSION文件
     return 0
 }
+
 
 install_nezha() {
     install -m 755 ${TMP_DIRECTORY}/dashboard ${WORKDIR}/dashboard
@@ -120,7 +135,7 @@ get_latest_version
 [ ! -e ${WORKDIR}/data/config.yaml ] && generate_config
 [ ! -e ${WORKDIR}/start.sh ] && generate_run
 
-if [ "${RELEASE_LATEST}" != "${CURRENT_VERSION}" ]; then
+if [ -n "$VERSION" ] || [ "${RELEASE_LATEST}" != "${CURRENT_VERSION}" ]; then
     download_nezha
     EXIT_CODE=$?
     if [ ${EXIT_CODE} -eq 0 ]; then
